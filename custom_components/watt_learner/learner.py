@@ -13,6 +13,7 @@ from __future__ import annotations
 import bisect
 import itertools
 import math
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from statistics import median, pstdev
@@ -29,6 +30,17 @@ DIRECTION_OFF = "off"
 
 # The pre window ends this many seconds before the switch, so the switch itself is not in it.
 PRE_GUARD_S = 2.0
+
+# A switch is evaluated this many seconds after its windows have passed: switch events can arrive
+# late, and so can the meter reading at the very end of the post window.
+GRACE_S = 8.0
+
+# At most this many open switches; when another one comes in, the oldest is dropped.
+MAX_PENDING = 500
+
+# A meter reading this far ahead of both the newest reading and the wall clock is a clock error.
+# Accepting it would prune every real reading against it.
+MAX_FUTURE_S = 300.0
 
 _UNKNOWN_STATES = ("unavailable", "unknown")
 _MEDIA_PLAYER_OFF = ("off", "standby")
@@ -84,7 +96,11 @@ class SampleBuffer:
         return len(self._ts)
 
     def add(self, ts: float, watts: float) -> bool:
-        """Store a reading. Implausible values (read errors, NaN, inf) are dropped and return False."""
+        """Store a reading. Implausible values are dropped and return False.
+
+        Implausible: read errors beyond max_abs_w, NaN, inf, and timestamps more than MAX_FUTURE_S
+        ahead of both the newest reading and the wall clock.
+        """
         try:
             value = float(watts)
             stamp = float(ts)
@@ -92,6 +108,10 @@ class SampleBuffer:
             return False
         if not math.isfinite(value) or not math.isfinite(stamp) or abs(value) > self.max_abs_w:
             return False
+        newest = self._ts[-1] if self._ts else None
+        if (newest is None or stamp > newest + MAX_FUTURE_S) and stamp > time.time() + MAX_FUTURE_S:
+            return False
+        # Readings out of order are sorted in; pruning goes by the newest reading seen.
         index = bisect.bisect_right(self._ts, stamp)
         self._ts.insert(index, stamp)
         self._watts.insert(index, value)
@@ -132,6 +152,7 @@ class _Switch:
     device_id: str
     ts: float
     direction: str
+    post_delay_s: float  # settling time at the moment of the switch
     due: float
 
 
@@ -165,14 +186,20 @@ class Tracker:
         if registration is None:
             return
         cfg = self.settings
+        delay = registration.post_delay_s
         switch = _Switch(
             seq=next(self._seq),
             device_id=device_id,
             ts=float(ts),
             direction=DIRECTION_ON if is_on else DIRECTION_OFF,
-            due=float(ts) + max(registration.post_delay_s + cfg.post_window_s, cfg.isolation_s),
+            post_delay_s=delay,
+            due=float(ts) + max(delay + cfg.post_window_s, cfg.isolation_s) + GRACE_S,
         )
         self._pending.append(switch)
+        if len(self._pending) > MAX_PENDING:
+            # Stays in the history: the meter saw it, so it still spoils its neighbours.
+            oldest = min(self._pending, key=lambda s: (s.ts, s.seq))
+            self._pending = [s for s in self._pending if s.seq != oldest.seq]
         self._history.append(switch)
         self._prune_history(float(ts))
 
@@ -210,7 +237,7 @@ class Tracker:
             return rejected(REJECT_FLAPPING)
 
         buffer = registration.buffer
-        delay = registration.post_delay_s
+        delay = switch.post_delay_s
         pre = buffer.window(switch.ts - cfg.pre_window_s, switch.ts - PRE_GUARD_S)
         post = buffer.window(switch.ts + delay, switch.ts + delay + cfg.post_window_s)
         needed = max(cfg.min_samples, 1)
@@ -241,6 +268,19 @@ def _round(value: float | None) -> float | None:
     return None if value is None else round(value, 1)
 
 
+def _whole_count(value: object) -> int | None:
+    """A stored rejection count as int, None unless it is a whole number >= 0."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        number = value
+    elif isinstance(value, float) and value.is_integer():
+        number = int(value)
+    else:
+        return None
+    return number if number >= 0 else None
+
+
 class DeviceStats:
     """Measurements and rejections of one device, with the learned value derived from them."""
 
@@ -258,20 +298,23 @@ class DeviceStats:
                 entry = {
                     "ts": float(item["ts"]),
                     "delta_w": float(item["delta_w"]),
-                    "direction": str(item["direction"]),
+                    "direction": item["direction"],
                 }
             except (KeyError, TypeError, ValueError):
                 continue
-            if math.isfinite(entry["ts"]) and math.isfinite(entry["delta_w"]):
+            if (
+                entry["direction"] in (DIRECTION_ON, DIRECTION_OFF)
+                and math.isfinite(entry["ts"])
+                and math.isfinite(entry["delta_w"])
+            ):
                 self._measurements.append(entry)
         self._trim()
         rejected = data.get("rejected") or {}
         if isinstance(rejected, dict):
             for reason, count in rejected.items():
-                try:
-                    self._rejected[str(reason)] = int(count)
-                except (TypeError, ValueError):
-                    continue
+                number = _whole_count(count)
+                if reason in REJECT_REASONS and number is not None:
+                    self._rejected[reason] = number
         last_reject = data.get("last_reject")
         self._last_reject = str(last_reject) if last_reject is not None else None
 
