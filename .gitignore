@@ -1,0 +1,5 @@
+__pycache__/
+.venv/
+.venv-ha/
+.pytest_cache/
+.claude/worktrees/
