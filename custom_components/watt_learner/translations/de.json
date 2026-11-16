@@ -1,0 +1,65 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Watt Learner",
+        "description": "Lernt, wie viel Watt ein Gerät oder eine Gerätegruppe zieht, indem der Hauszähler kurz vor und kurz nach dem Schalten verglichen wird. Die Gruppe gilt als an, sobald ein Mitglied an ist.",
+        "data": {
+          "name": "Name",
+          "meter": "Hauszähler (Leistungssensor)",
+          "compensation": "Ausgleichssensoren",
+          "members": "Mitglieder der Gerätegruppe"
+        },
+        "data_description": {
+          "meter": "Ein Leistungssensor, der etwa alle 10 Sekunden meldet.",
+          "compensation": "Optional. Ihre Leistung wird zum Zählerwert addiert, z. B. eine Solarbank, die ins Haus einspeist.",
+          "members": "Lichter, Schalter, Ventilatoren, Mediaplayer oder Eingabe-Schalter."
+        }
+      }
+    },
+    "error": {
+      "no_members": "Wähle mindestens ein Mitglied aus."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Watt Learner",
+        "description": "Beim Speichern wird der Eintrag neu geladen. Die gelernten Werte bleiben erhalten.",
+        "data": {
+          "meter": "Hauszähler (Leistungssensor)",
+          "compensation": "Ausgleichssensoren",
+          "members": "Mitglieder der Gerätegruppe",
+          "post_delay_s": "Einschwingzeit nach dem Schalten"
+        },
+        "data_description": {
+          "meter": "Ein Leistungssensor, der etwa alle 10 Sekunden meldet.",
+          "compensation": "Optional. Ihre Leistung wird zum Zählerwert addiert, z. B. eine Solarbank, die ins Haus einspeist.",
+          "members": "Lichter, Schalter, Ventilatoren, Mediaplayer oder Eingabe-Schalter.",
+          "post_delay_s": "So lange brauchen die Geräte, bis sie gleichmäßig ziehen und der Zähler erneut gelesen wird."
+        }
+      }
+    },
+    "error": {
+      "no_members": "Wähle mindestens ein Mitglied aus."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "learned_power": {
+        "name": "Gelernte Leistung"
+      },
+      "power": {
+        "name": "Leistung"
+      },
+      "measurements": {
+        "name": "Messungen"
+      }
+    },
+    "button": {
+      "reset": {
+        "name": "Zurücksetzen"
+      }
+    }
+  }
+}

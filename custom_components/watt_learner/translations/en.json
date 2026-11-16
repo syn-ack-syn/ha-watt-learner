@@ -1,0 +1,65 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Watt Learner",
+        "description": "Learns how many watts a device or device group draws by comparing the house meter shortly before and after it switches. The group counts as on as soon as one member is on.",
+        "data": {
+          "name": "Name",
+          "meter": "House meter (power sensor)",
+          "compensation": "Compensation sensors",
+          "members": "Members of the device group"
+        },
+        "data_description": {
+          "meter": "A power sensor that reports about every 10 seconds.",
+          "compensation": "Optional. Their power is added to the meter reading, e.g. a solar bank feeding the house.",
+          "members": "Lights, switches, fans, media players or input booleans."
+        }
+      }
+    },
+    "error": {
+      "no_members": "Choose at least one member."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Watt Learner",
+        "description": "Saving reloads the entry. The learned values are kept.",
+        "data": {
+          "meter": "House meter (power sensor)",
+          "compensation": "Compensation sensors",
+          "members": "Members of the device group",
+          "post_delay_s": "Settling time after switching"
+        },
+        "data_description": {
+          "meter": "A power sensor that reports about every 10 seconds.",
+          "compensation": "Optional. Their power is added to the meter reading, e.g. a solar bank feeding the house.",
+          "members": "Lights, switches, fans, media players or input booleans.",
+          "post_delay_s": "How long the devices need to reach a steady draw before the meter is read again."
+        }
+      }
+    },
+    "error": {
+      "no_members": "Choose at least one member."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "learned_power": {
+        "name": "Learned power"
+      },
+      "power": {
+        "name": "Power"
+      },
+      "measurements": {
+        "name": "Measurements"
+      }
+    },
+    "button": {
+      "reset": {
+        "name": "Reset"
+      }
+    }
+  }
+}
